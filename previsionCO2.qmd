@@ -1,0 +1,263 @@
+---
+-Ben-amar Amal--
+title: "Travail V : TRAITEMENT DES DONNEES : Séries temporelles et reproductibilité"
+format: html
+editor: Visual
+
+Installation des packages 
+install.packages("lubridate")
+install.packages("tsibble")
+install.packages("feasts")
+install.packages("fable")
+install.packages("fabletools")
+install.packages("forecast")
+install.packages("tidymodels")
+
+#Chargement des packages 
+library(readr)
+library(lubridate)
+library(dplyr)
+library(ggplot2)
+library(tsibble)
+library(feasts)
+library(fable)
+library(forecast)
+library(fabletools)
+library(tidymodels)
+
+
+#Importation des donnees 
+hawai <- read.csv("hawai.csv")
+View(hawai) #afficher le tableau des donnees 
+str(hawai) #voir la structure des variables 
+
+
+#Transformation des données de la variable time et supression de la varaible time 
+Periode <- date_decimal(hawai$time, tz = "UTC")
+Periode 
+hawai <- hawai %>% mutate(Periode=Periode)
+hawai<- data.frame(hawai)
+hawai <- subset(hawai, select = -time)
+hawai <- hawai |> 
+  mutate(year = Periode |> date())
+
+hawai <- subset(hawai, select = -Periode)
+View(hawai)
+str(hawai)
+
+#création d'une serie temporelle 
+hawai_ts <- tsibble(hawai, index = year)
+View(hawai_ts)
+
+# Tracer le graphique
+ggplot(data = hawai_ts, aes(x = year, y = CO2)) +
+  geom_line(color = "blue") +
+  labs(x = "Date", y = "CO2") +
+  ggtitle("L'évolution du CO2 en fonction des années")
+  
+  
+
+#Separation des series en traitement et test 
+dat_split <- initial_split(hawai_ts, prop = 0.7) 
+train <- training(dat_split) 
+View(train)
+test <- testing(dat_split)
+View(test)
+
+
+# créer un data frame avec la colonne "density" et l'index "date"
+dt <- data.frame(CO2 = train$CO2, year = train$year)
+
+# Conversion des données en série chronologique
+train_ts <- ts(dt$CO2, frequency = 12, start = c(1958, 3))
+
+# Conversion des données en série chronologique
+test_ts <- ts(test$CO2, frequency = 12, start = c(1958, 3))
+
+
+# Création du modèle ARIMA
+ARIMA_model <- auto.arima(train_ts, seasonal = FALSE)
+
+
+# Prédire sur les données de test
+arima_predi <- ARIMA_model %>%
+  forecast(new_data = test_ts)
+
+
+library(ggplot2)
+# Création d'un graphique des données de test
+ggplot(data = test, aes(x = year, y = CO2)) +
+  geom_line() +
+  labs(title = "Données de test - Niveaux de CO2", x = "Année", y = "CO2")
+  
+  
+
+# Affichage des diagnostics du modèle : analyse des résidus
+checkresiduals(arima_predi)
+
+summary(arima_predi)
+---
+
+## Importation des packages nécessaires
+
+```{r}
+#Installation des packages 
+#install.packages("lubridate")
+#install.packages("tsibble")
+#install.packages("feasts")
+#install.packages("fable")
+#install.packages("fabletools")
+#install.packages("forecast")
+#install.packages("tidymodels")
+
+#Chargement des packages 
+library(readr)
+library(lubridate)
+library(dplyr)
+library(ggplot2)
+library(tsibble)
+library(feasts)
+library(fable)
+library(forecast)
+library(fabletools)
+library(tidymodels)
+```
+
+## 1. Créer une série temporelle du CO2 à partir des données de *hawai.csv*
+
+```{r}
+
+#Importation des donnees 
+hawai <- read.csv("hawai.csv")
+View(hawai) #afficher le tableau des donnees 
+str(hawai) #voir la structure des variables 
+
+```
+
+```{r}
+
+#Transformation des données de la variable time et supression de la varaible time 
+
+Periode <- date_decimal(hawai$time, tz = "UTC")
+Periode 
+
+hawai <- hawai %>% mutate(Periode=Periode)
+
+hawai<- data.frame(hawai)
+
+hawai <- subset(hawai, select = -time)
+
+hawai <- hawai |> 
+  mutate(year = Periode |> date())
+
+hawai <- subset(hawai, select = -Periode)
+View(hawai)
+str(hawai)
+
+```
+
+```{r}
+
+#création d'une serie temporelle 
+hawai_ts <- tsibble(hawai, index = year)
+View(hawai_ts)
+```
+
+```{r}
+# Tracer le graphique
+ggplot(data = hawai_ts, aes(x = year, y = CO2)) +
+  geom_line(color = "blue") +
+  labs(x = "Date", y = "CO2") +
+  ggtitle("L'évolution du CO2 en fonction des années")
+```
+
+## 2. Séparer la série en parties d'entraînement (environ 70% des données) et en partie test
+
+```{r}
+
+#Separation des series en traitement et test 
+
+dat_split <- initial_split(hawai_ts, prop = 0.7) 
+train <- training(dat_split) 
+View(train)
+test <- testing(dat_split)
+View(test)
+
+```
+
+## 3. Créer un modèle prévisionnel sur les données d'entraînement, puis projeter la prévision de CO2 atmosphérique pour comparer aux données test
+
+```{r}
+# créer un data frame avec la colonne "density" et l'index "date"
+dt <- data.frame(CO2 = train$CO2, year = train$year)
+
+# Conversion des données en série chronologique
+train_ts <- ts(dt$CO2, frequency = 12, start = c(1958, 3))
+
+# Conversion des données en série chronologique
+test_ts <- ts(test$CO2, frequency = 12, start = c(1958, 3))
+```
+
+```{r}
+# Création du modèle ARIMA
+ARIMA_model <- auto.arima(train_ts, seasonal = FALSE)
+
+```
+
+```{r}
+
+
+# Prédire sur les données de test
+arima_predi <- ARIMA_model %>%
+  forecast(new_data = test_ts)
+
+
+library(ggplot2)
+# Création d'un graphique des données de test
+ggplot(data = test, aes(x = year, y = CO2)) +
+  geom_line() +
+  labs(title = "Données de test - Niveaux de CO2", x = "Année", y = "CO2")
+
+```
+
+## 4. Effectuer une analyse des résidus
+
+```{r}
+
+# Affichage des diagnostics du modèle : analyse des résidus
+checkresiduals(arima_predi)
+
+summary(arima_predi)
+```
+
+## Interprétation des résultats 
+
+Interprétation des résidus de notre modèle ARIMA(0,0,0) avec une moyenne non nulle. Voici quelques éléments à considérer dans notre analyse :
+
+1\. Test de Ljung-Box :
+
+ - La statistique de test Q\* est de 27.608 avec 24 degrés de liberté et une valeur p de 0.2769.
+
+ - Le test de Ljung-Box est utilisé pour vérifier l'autocorrélation des résidus. Une valeur p élevée (supérieure à un seuil généralement fixé à 0.05) indique que les résidus sont indépendants au-delà du hasard, ce qui est souhaitable.
+
+2\. Modèle ARIMA(0,0,0) avec non-zero mean:
+
+ - Le modèle utilise une moyenne non nulle de 338.9153 avec un écart type de 0.8823.
+
+ - Le log-vraisemblance, l'AIC, l'AIC corrigé (AICc) et le BIC sont fournis pour évaluer la qualité du modèle.
+
+3\. Mesures d'erreur :
+
+ - Les mesures d'erreur telles que l'erreur moyenne (ME), la racine de l'erreur quadratique moyenne (RMSE), l'erreur absolue moyenne (MAE), l'erreur de pourcentage moyen (MPE), l'erreur absolue de pourcentage moyen (MAPE), l'erreur de moyenne absolue de saisonnalité (MASE) et l'autocorrélation des résidus (ACF1) sont fournies pour évaluer la précision du modèle sur l'ensemble d'entraînement.
+
+## 5. Commenter: le modèle est-il fiable? Comment pourrait-il être amélioré?
+
+\- La non-significativité du test de Ljung-Box suggère que les résidus sont indépendants, ce qui est une bonne indication de la qualité du modèle.
+
+\- Cependant, le modèle ARIMA(0,0,0) avec une moyenne non nulle est très simple et pourrait ne pas capturer les tendances ou les saisons importantes dans les données.
+
+\- On pourra envisager d'expérimenter avec des ordres ARIMA plus complexes, en incluant des termes autorégressifs (AR) et de moyenne mobile (MA), ainsi que des termes saisonniers si nécessaire.
+
+\- On pourra également explorer d'autres modèles de séries chronologiques plus avancés tels que les modèles SARIMA, les modèles de régression avec des prédicteurs exogènes, ou même les réseaux de neurones récurrents (RNN) pour capturer des modèles plus complexes dans les données.
+
+\- En outre, l'exploration des facteurs externes qui pourraient influencer les niveaux de CO2 atmosphérique, tels que les activités humaines ou les conditions météorologiques, pourrait améliorer la précision des prévisions.
